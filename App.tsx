@@ -1,16 +1,9 @@
-/**
- * Sample React Native App
- * https://github.com/facebook/react-native
- *
- * @format
- */
-
-import { NewAppScreen } from '@react-native/new-app-screen';
-import { StatusBar, StyleSheet, useColorScheme, View } from 'react-native';
+import { StatusBar, StyleSheet, Text, useColorScheme } from 'react-native';
 import {
   SafeAreaProvider,
-  useSafeAreaInsets,
 } from 'react-native-safe-area-context';
+
+import SearchDevices from './src/components/SearchDevices';
 
 function App() {
   const isDarkMode = useColorScheme() === 'dark';
@@ -23,22 +16,23 @@ function App() {
   );
 }
 
-function AppContent() {
-  const safeAreaInsets = useSafeAreaInsets();
+import { SafeAreaView } from 'react-native-safe-area-context';
 
+function AppContent() {
   return (
-    <View style={styles.container}>
-      <NewAppScreen
-        templateFileName="App.tsx"
-        safeAreaInsets={safeAreaInsets}
-      />
-    </View>
+    <SafeAreaView style={styles.safeArea} edges={["top", "bottom"]}>
+      <Text>My New App</Text>
+      <SearchDevices />
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  safeArea: {
+    backgroundColor: 'white',
     flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
 
