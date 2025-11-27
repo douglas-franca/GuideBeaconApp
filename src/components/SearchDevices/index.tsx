@@ -1,108 +1,101 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useEffect, useRef, useCallback } from 'react';
 
-import { BleManager } from 'react-native-ble-plx';
+import { BleManager, Device } from 'react-native-ble-plx';
 
 import { requestBluetoothPermissions } from '../../services/devices/permissions';
-import { useDeviceStore } from '../../stores/DeviceStore';
-import { Text, View } from 'react-native';
 
 const manager = new BleManager();
 
-const INTERVAL_SCAN = 2000; // 3 seconds
-const TIMEOUT_SCAN = 10000; // 15 seconds
+const TIMEOUT_SCAN = 8000; // 8 seconds between scans
 
-function SearchDevices() {
-  const [isScanning, setIsScanning] = useState(false);
-  const [device, setDevice] = useState(null);
-  const [currentDevice, setCurrentDevice] = useState(null);
-  const getDeviceByServiceUuid = useDeviceStore((state) => state.getDeviceByServiceUuid);
+type SearchDevicesProps = {
+  scanDuration?: number;
+  repeatInterval?: number;
+  onDevicesFound?: (devices: Device[], isScanning: boolean) => void;
+};
 
-  const intervalRef = useRef(null);
+function SearchDevices({ 
+  repeatInterval = TIMEOUT_SCAN, 
+  onDevicesFound 
+}: SearchDevicesProps) {
+  const devicesRef = useRef<Device[]>([]);
+  const isScanningRef = useRef(false);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const setNearDevice = useCallback((deviceFromScan) => {
-    if (!device) {
-      setDevice(deviceFromScan);
+  const notifyParent = useCallback((devices: Device[], scanning: boolean) => {
+    if (onDevicesFound) {
+      onDevicesFound(devices, scanning);
     }
-    console.log('Dispositivo encontrado no scan:', deviceFromScan.name, deviceFromScan.rssi, deviceFromScan.serviceData);
-    if (
-      deviceFromScan.rssi
-      && (
-        !device?.rssi
-        || (device.rssi > deviceFromScan.rssi)
-      )
-    ) {
-      setDevice(deviceFromScan);
+  }, [onDevicesFound]);
+
+  const stopScan = useCallback(async () => {
+    if (!isScanningRef.current) {
+      return;
     }
+    
+    await manager.stopDeviceScan();
+    isScanningRef.current = false;
 
-    console.log('Dispositivo com maior RSSI:', deviceFromScan.name, deviceFromScan.serviceData);
-    const serviceDataUuids = Object.keys(deviceFromScan.serviceData || {});
-    if (serviceDataUuids.length > 0) {
-      serviceDataUuids.forEach((serviceUuid) => {
-        // const serviceUuid = serviceDataUuids[0];
-        const foundDevice = getDeviceByServiceUuid(serviceUuid);
+    console.log(`Escaneamento finalizado. ${devicesRef.current.length} dispositivos encontrados.`);
+    notifyParent(devicesRef.current, false);
+  }, [notifyParent]);
 
-        if (foundDevice && foundDevice !== currentDevice) {
-          setCurrentDevice(foundDevice);
-          console.log('Dispositivo mais próximo:', foundDevice);
-        }
-      });
-    }
-  }, [device, getDeviceByServiceUuid, currentDevice]);
-
-  const scanDevices = async () => {
+  const scanDevices = useCallback(async () => {
     const permissionGranted = await requestBluetoothPermissions();
     if (!permissionGranted) {
-      console.log('Permissão de localização não concedida');
+      console.log('Permissão Bluetooth não concedida');
+      notifyParent([], false);
       return;
     }
 
-    setIsScanning(true);
+    await stopScan();
+    
+    isScanningRef.current = true;
+    devicesRef.current = [];
+    console.log('Iniciando escaneamento de dispositivos Bluetooth...');
 
     manager.startDeviceScan(null, null, (error, device) => {
       if (error) {
-        console.error('Error in startDeviceScan', error);
+        console.error('Error in startDeviceScan:', error);
         return;
       }
-      if (device) {
-        setNearDevice(device);
+      
+      if (device && isScanningRef.current) {
+        // Add device if not already in the list
+        const exists = devicesRef.current.find((d) => d.name === device.name);
+        if (!exists) {
+          devicesRef.current = [...devicesRef.current, device];
+        } else {
+          // Update existing device info
+          devicesRef.current = devicesRef.current.map((d) =>
+            d.name === device.name ? device : d
+          );
+        }
       }
     });
 
-    // Para o escaneamento após um tempo definido
-    setTimeout(() => {
-      manager.stopDeviceScan();
-      setIsScanning(false);
-    }, INTERVAL_SCAN);
-  };
+  }, [notifyParent, stopScan]);
 
   useEffect(() => {
-    // Inicia o primeiro escaneamento
+    // Start first scan immediately
     scanDevices();
 
-    // Configura um intervalo para chamar scanDevices periodicamente
-    intervalRef.current = setInterval(scanDevices, TIMEOUT_SCAN);
+    // Set up repeated scanning if repeatInterval is provided
+    if (repeatInterval > 0) {
+      intervalRef.current = setInterval(scanDevices, repeatInterval);
+    }
 
-    // Função de limpeza
+    // Cleanup on unmount
     return () => {
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
       }
+
       manager.stopDeviceScan();
     };
   }, []);
 
-  return <View>
-    <Text>Dispositivo mais próximo:</Text>
-    {currentDevice ? (
-      <View>
-        <Text>Nome: {currentDevice.name}</Text>
-        <Text>Descrição: {currentDevice.description}</Text>
-        <Text>UUID: {currentDevice.uuid}</Text>
-      </View>
-    ) : (
-      <Text>Nenhum dispositivo próximo encontrado.</Text>
-    )}
-  </View>;
+  return null;
 }
 
 export default SearchDevices;

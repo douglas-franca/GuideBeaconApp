@@ -1,9 +1,17 @@
-import { StatusBar, StyleSheet, Text, useColorScheme } from 'react-native';
-import {
-  SafeAreaProvider,
-} from 'react-native-safe-area-context';
+import React from 'react';
+import { StatusBar, useColorScheme } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { NavigationContainer } from '@react-navigation/native';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import Home from './src/pages/Home';
+import RegisterDevice from './src/pages/RegisterDevice';
 
-import SearchDevices from './src/components/SearchDevices';
+export type RootStackParamList = {
+  Home: undefined;
+  RegisterDevice: undefined;
+};
+
+const Stack = createNativeStackNavigator<RootStackParamList>();
 
 function App() {
   const isDarkMode = useColorScheme() === 'dark';
@@ -11,29 +19,25 @@ function App() {
   return (
     <SafeAreaProvider>
       <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
-      <AppContent />
+      <NavigationContainer>
+        <Stack.Navigator
+          initialRouteName="Home"
+          screenOptions={{
+            headerShown: false,
+          }}>
+          <Stack.Screen name="Home" component={Home} />
+          <Stack.Screen 
+            name="RegisterDevice" 
+            component={RegisterDevice}
+            options={{
+              headerShown: true,
+              title: 'Register Device',
+            }}
+          />
+        </Stack.Navigator>
+      </NavigationContainer>
     </SafeAreaProvider>
   );
 }
-
-import { SafeAreaView } from 'react-native-safe-area-context';
-
-function AppContent() {
-  return (
-    <SafeAreaView style={styles.safeArea} edges={["top", "bottom"]}>
-      <Text>My New App</Text>
-      <SearchDevices />
-    </SafeAreaView>
-  );
-}
-
-const styles = StyleSheet.create({
-  safeArea: {
-    backgroundColor: 'white',
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-});
 
 export default App;
